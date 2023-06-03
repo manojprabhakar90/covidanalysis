@@ -1,0 +1,181 @@
+---
+title: "Covid Analysis"
+author: "Untitled"
+date: "2023-06-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Import the required packages
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+
+url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
+
+filenames = c("time_series_covid19_confirmed_US.csv","time_series_covid19_confirmed_global.csv","time_series_covid19_deaths_US.csv","time_series_covid19_deaths_global.csv","time_series_covid19_recovered_global.csv")
+
+urls =str_c(url,filenames)
+urls
+
+us_cases = read_csv(urls[1])
+global_cases = read_csv(urls[3])
+us_deaths = read_csv(urls[3])
+global_deaths = read_csv(urls[4])
+global_recovered = read_csv(urls[5])
+
+population=read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/UID_ISO_FIPS_LookUp_Table.csv")
+# Analyzing Global Recovered Data
+
+global_recovered <- global_recovered %>% pivot_longer(cols=-c(`Province/State`,`Country/Region`,Lat, Long),
+                                                      names_to = "date",
+                                                      values_to = "recovered")%>%
+  select(-c(Lat,Long))
+
+global_cases <- select(global_cases,-c(Lat,Long_,UID,iso2,iso3,code3,FIPS,Admin2))
+
+global_cases <- global_cases %>%
+  select(-c(Combined_Key, Population)) %>%
+  pivot_longer(cols = -c(Province_State, Country_Region),
+               names_to = "date",
+               values_to = "cases")
+
+
+global_deaths <- global_deaths %>% pivot_longer(cols=-c(`Province/State`,`Country/Region`,Lat, Long),
+                                                      names_to = "date",
+                                                      values_to = "deaths")%>%
+  select(-c(Lat,Long))
+
+global_cases$date <- as.Date(global_cases$date,format="%m/%d/%y")
+global_recovered$date <- as.Date(global_recovered$date,format="%m/%d/%y")
+global_deaths$date <- as.Date(global_deaths$date,format="%m/%d/%y")
+
+# only selected countries
+
+selected_countries <- c("China", "United Kingdom", "India")
+
+global_recovered_filtered <- subset(global_recovered, `Country/Region` %in% selected_countries)
+
+global_deaths_filtered<- subset(global_deaths, `Country/Region` %in% selected_countries)
+
+global_cases_filtered<- subset(global_cases, Country_Region %in% selected_countries)
+
+global <- global_recovered_filtered %>% full_join(global_deaths_filtered)
+
+colnames(global)[colnames(global) == "Country/Region"] <- "Country_Region"
+
+population_countries = subset(population, select = c(Country_Region, Combined_Key,Population))
+
+population_filtered <- subset(population_countries, Country_Region %in% selected_countries)
+
+global<- unite(global, Combined_Key, 'Province/State', 'Country_Region', sep = ", ")
+
+global <- merge(global, population_filtered, by = "Combined_Key")
+
+global <- separate(global, Combined_Key, into = c("Province/State", "Country"), sep = ", ")
+
+
+global_by_state <- global %>% group_by(`Province/State`,Country_Region,date)%>%
+  summarize(recovered=sum(recovered),deaths=sum(deaths),Population=sum(Population))%>%
+  mutate(deaths_per_mil=deaths*1000000/Population)%>%
+  select('Province/State',Country_Region,date,deaths,recovered,deaths_per_mil,Population)%>%
+  ungroup()
+
+global_by_state %>%
+  ggplot(aes(x=date,y=deaths))+
+  geom_line(aes(color="deaths"))+
+  geom_point(aes(color="deaths"))+
+  geom_line(aes(y=recovered,color="recovered"))+
+  geom_point(aes(y=recovered,color="recovered"))+
+  scale_y_log10()+
+  theme(legend.position="bottom",
+        axis.text.x=element_text(angle=90))+
+  labs(title = "Recovery and Deaths in UK, India and China",y=NULL)
+
+province="Beijing"
+
+global_by_state %>%
+  filter(`Province/State`==province)%>%
+  ggplot(aes(x=date,y=recovered))+
+  geom_line(aes(color="recovered"))+
+  geom_point(aes(color="recovered"))+
+  geom_line(aes(y=deaths,color="deaths"))+
+  geom_point(aes(y=deaths,color="deaths"))+
+  scale_y_log10()+
+  theme(legend.position="bottom",
+        axis.text.x=element_text(angle=90))+
+  labs(title = str_c("Recovery and Deaths in ",province),y=NULL)
+
+province="Channel Islands"
+
+global_by_state %>%
+  filter(`Province/State`==province)%>%
+  ggplot(aes(x=date,y=recovered))+
+  geom_line(aes(color="recovered"))+
+  geom_point(aes(color="recovered"))+
+  geom_line(aes(y=deaths,color="deaths"))+
+  geom_point(aes(y=deaths,color="deaths"))+
+  scale_y_log10()+
+  theme(legend.position="bottom",
+        axis.text.x=element_text(angle=90))+
+  labs(title = str_c("Recovery and Deaths in ",province),y=NULL)
+
+global_by_state <- global_by_state %>% mutate(new_recovered = recovered-lag(recovered),
+                                              new_deaths = deaths-lag(deaths))
+
+global_by_state %>%
+  ggplot(aes(x=date,y=new_deaths))+
+  geom_line(aes(color="new_deaths"))+
+  geom_point(aes(color="new_deaths"))+
+  geom_line(aes(y=new_recovered,color="new_recovered"))+
+  geom_point(aes(y=new_recovered,color="new_recovered"))+
+  scale_y_log10()+
+  theme(legend.position="bottom",
+        axis.text.x=element_text(angle=90))+
+  labs(title = "Recovery and Deaths in UK, India and China",y=NULL)
+
+province="Beijing"
+
+global_by_state %>%
+  filter(`Province/State`==province)%>%
+  ggplot(aes(x=date,y=new_recovered))+
+  geom_line(aes(color="new_recovered"))+
+  geom_point(aes(color="new_recovered"))+
+  geom_line(aes(y=new_deaths,color="new_deaths"))+
+  geom_point(aes(y=new_deaths,color="new_deaths"))+
+  scale_y_log10()+
+  theme(legend.position="bottom",
+        axis.text.x=element_text(angle=90))+
+  labs(title = str_c("Recovery and Deaths in ",province),y=NULL)
+
+province="Channel Islands"
+
+global_by_state %>%
+  filter(`Province/State`==province)%>%
+  ggplot(aes(x=date,y=new_recovered))+
+  geom_line(aes(color="new_recovered"))+
+  geom_point(aes(color="new_recovered"))+
+  geom_line(aes(y=new_deaths,color="new_deaths"))+
+  geom_point(aes(y=new_deaths,color="new_deaths"))+
+  scale_y_log10()+
+  theme(legend.position="bottom",
+        axis.text.x=element_text(angle=90))+
+  labs(title = str_c("Recovery and Deaths in ",province),y=NULL)
+
+
+model = lm (deaths_per_mil~recovered,data=global_by_state)
+
+summary(model)
+
+```
+
+SUMMARY:
+
+1. The recovery phase has started from Q2 2022 due to the increase in the vaccination and herd immunity. The same can be seen in the data as well. Both new deaths and deaths have reduced.  
+2. The linear regression model was run with recovered as independent variable and cases per million as dependent variable. 
+3. As expected the variable turned out to be significant. This means that, as the number of recovery cases increases, the number of deaths reduce. 
+4. There is no multicollinearity as its an univariate regression. 
