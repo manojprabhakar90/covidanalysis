@@ -5,6 +5,21 @@ date: "2023-06-02"
 output: html_document
 ---
 
+Introduction:
+
+In this analysis, we are trying to understand the number of covid cases, deaths and recovery from the John Hopkins data available in github. 
+
+We will also try to establish a relationship between deaths and other independent variables. 
+There are 6 data sources. 
+
+1. Cases in United States
+2. Deaths in United States
+3. Global Cases
+4. Global Deaths
+5. Global Recovery
+6. Population by Province and Country
+
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -14,6 +29,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(dplyr)
 library(tidyr)
+library(car)
 
 url = "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
 
@@ -167,9 +183,11 @@ global_by_state %>%
   labs(title = str_c("Recovery and Deaths in ",province),y=NULL)
 
 
-model = lm (deaths_per_mil~recovered,data=global_by_state)
+model = lm (deaths_per_mil~recovered+`Province/State`,data=global_by_state)
 
 summary(model)
+
+vif(model)
 
 ```
 
@@ -178,4 +196,5 @@ SUMMARY:
 1. The recovery phase has started from Q2 2022 due to the increase in the vaccination and herd immunity. The same can be seen in the data as well. Both new deaths and deaths have reduced.  
 2. The linear regression model was run with recovered as independent variable and cases per million as dependent variable. 
 3. As expected the variable turned out to be significant. This means that, as the number of recovery cases increases, the number of deaths reduce. 
-4. There is no multicollinearity as its an univariate regression. 
+4. The VIF (Variance Inflation Factor) measures multicollinearity in a regression analysis.Multicollinearity gives an indication that, if two variables are capturing the same variance of our dependent variable, it is always better to use one of the two variables. A VIF value below 5 suggests no significant multicollinearity. In our case, with a VIF of 1.80, there is no multicollinearity. Therefore, we can confidently use all the variables in our analysis without concerns about redundancy or multicollinearity.
+5. Adjusted R Squared is 0.5696 (which means the variables we have used for our analysis are very much useful in predicting the number of deaths per million). 56% of variance of our Y variable has been captured by the Province/State and recovered variable. 
