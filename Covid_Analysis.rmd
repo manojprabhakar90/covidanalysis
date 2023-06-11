@@ -190,6 +190,8 @@ summary(model)
 vif(model)
 
 ```
+Bias:
+1. Bias - Data collection wasn't transparent. Too many missing values in important columns cannot confirm the hypothesis.
 
 SUMMARY:
 
